@@ -2,6 +2,8 @@
 *.json
 .credentials/
 
+.DS_Store
+
 # Ignore my test files
 **/test.ipynb
 
