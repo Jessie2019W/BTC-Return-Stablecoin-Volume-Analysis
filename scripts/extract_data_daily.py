@@ -15,9 +15,9 @@ class MarketRecord:
     market_cap: float
     coin_id: str
 
-def fetch_coingecko_history(coin_id: str, target_date_str: str):
+def fetch_coingecko_daily(coin_id: str, target_date_str: str):
     """
-    Fetches a historical snapshot for a specific coin.
+    Fetches a daily snapshot for a specific coin.
     target_date_str format: 'YYYY-MM-DD'
     """
     # Convert 'YYYY-MM-DD' to 'DD-MM-YYYY' as required by the /history API
@@ -68,7 +68,7 @@ def main():
     all_results = []
     for coin in coins_to_fetch:
         print(f"Starting data extraction for {coin}...")
-        result = fetch_coingecko_history(coin, target_date)
+        result = fetch_coingecko_daily(coin, target_date)
         if result:
             all_results.append(asdict(result))
     
