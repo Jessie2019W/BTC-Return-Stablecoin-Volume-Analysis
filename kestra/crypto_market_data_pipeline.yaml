@@ -1,0 +1,176 @@
+id: crypto_market_data_pipeline
+namespace: dev
+
+variables:
+  # T-1 Logic: Get the date of the previous day to get a complete dataset for the day that just ended
+  target_date: "{{ trigger.date | dateAdd(-1, 'DAYS') | date('yyyy-MM-dd') }}"
+  file: "{{vars.target_date}}_crypto_market_data.parquet"
+  gcs_file: "gs://{{kv('GCP_BUCKET_NAME')}}/{{vars.file}}"
+  extracted_data: "{{outputs.extract_crypto_data.outputFiles['crypto_market_data.parquet']}}"
+  bq_table: "{{kv('GCP_PROJECT_ID')}}.raw_dataset.crypto_market"
+
+tasks:
+  - id: log_target_date
+    type: io.kestra.plugin.core.log.Log
+    message: 
+      - The current target date is {{ render(vars.target_date) }}.
+
+  - id: extract_crypto_data
+    type: io.kestra.plugin.scripts.python.Script
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+    containerImage: python:3.11-slim
+    dependencies:
+      - requests
+      - pandas
+      - pyarrow 
+    env:
+      TRIGGER_DATE: "{{ vars.target_date }}"
+    outputFiles:
+      - "crypto_market_data.parquet"
+    script: |
+      import os
+      import sys
+      import time
+      import requests
+      import pandas as pd
+      from dataclasses import dataclass, asdict
+      from datetime import datetime
+
+      @dataclass
+      class MarketRecord:
+          """Defines the schema for the data warehouse table."""
+          date: datetime
+          price: float
+          total_volume: float
+          market_cap: float
+          coin_id: str
+
+      def fetch_coingecko_history(coin_id: str, target_date_str: str):
+          """
+          Fetches a historical snapshot for a specific coin.
+          target_date_str format: 'YYYY-MM-DD'
+          """
+          # Convert 'YYYY-MM-DD' to 'DD-MM-YYYY' as required by the /history API
+          dt_obj = datetime.strptime(target_date_str, "%Y-%m-%d")
+          formatted_date = dt_obj.strftime("%d-%m-%Y")
+
+          url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/history"
+          params = {
+              "date": formatted_date,
+              "localization": "false"
+          }
+
+          try:
+              # Wait for rate limits
+              time.sleep(1) 
+              response = requests.get(url, params=params, timeout=15)
+              response.raise_for_status()
+              data = response.json()
+
+              market_data = data.get("market_data", {})
+              if not market_data:
+                  print(f"No market data fetched for {coin_id} on {formatted_date}")
+                  return None
+
+              # Extract USD price from nested response
+              return MarketRecord(
+                  date=dt_obj,
+                  price=market_data.get("current_price", {}).get("usd", 0.0),
+                  total_volume=market_data.get("total_volume", {}).get("usd", 0.0),
+                  market_cap=market_data.get("market_cap", {}).get("usd", 0.0),
+                  coin_id=coin_id
+              )
+          except Exception as e:
+              print(f"Error fetching {coin_id} on {formatted_date}: {e}")
+              return None
+
+      def main():
+          # Receive date variable from Kestra
+          target_date = os.getenv("TRIGGER_DATE")
+
+          if not target_date:
+              print("TRIGGER_DATE environment variable is missing.")
+              sys.exit(1)
+
+          # List of coins to analyze, can be expanded to more coins in the future
+          coins_to_fetch = ["bitcoin", "tether"]
+          
+          all_results = []
+          for coin in coins_to_fetch:
+              print(f"Starting data extraction for {coin}...")
+              result = fetch_coingecko_history(coin, target_date)
+              if result:
+                  all_results.append(asdict(result))
+          
+          if all_results:
+              # Combine all coins into a single DataFrame
+              df = pd.DataFrame(all_results)
+              output_file = "crypto_market_data.parquet"
+              
+              # Save as Parquet - Kestra will capture this file as an output
+              df.to_parquet(output_file, index=False, engine='pyarrow')
+              print(f"Saved data of {coins_to_fetch} for {target_date}")
+          else:
+              print("Data collection failed: No records retrieved.")
+              sys.exit(1)   # Exit the program with an error
+
+      if __name__ == "__main__":
+          main()
+
+  - id: upload_to_gcs
+    type: io.kestra.plugin.gcp.gcs.Upload
+    from: "{{render(vars.extracted_data)}}"
+    to: "{{render(vars.gcs_file)}}"
+
+  - id: create_bq_table
+    type: io.kestra.plugin.gcp.bigquery.Query
+    description: "Create the internal table header if it doesn't exist, partitioned by date"
+    sql: |
+      CREATE TABLE IF NOT EXISTS `{{render(vars.bq_table)}}`
+      (
+          date TIMESTAMP,
+          price FLOAT64,
+          total_volume FLOAT64,
+          market_cap FLOAT64,
+          coin_id STRING
+      )
+      PARTITION BY DATE(date)
+      CLUSTER BY coin_id;
+
+  - id: load_to_staging
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    description: "Load today's Parquet file into a temporary staging table"
+    from: 
+      - "{{render(vars.gcs_file)}}"
+    destinationTable: "{{render(vars.bq_table)}}_staging"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+
+  - id: merge_to_final
+    type: io.kestra.plugin.gcp.bigquery.Query
+    description: "Merge staging into final internal table to prevent duplicates"
+    sql: |
+      MERGE INTO `{{render(vars.bq_table)}}` T
+      USING `{{render(vars.bq_table)}}_staging` S
+      ON T.date = S.date AND T.coin_id = S.coin_id
+      WHEN NOT MATCHED THEN
+        INSERT (date, price, total_volume, market_cap, coin_id)
+        VALUES (S.date, S.price, S.total_volume, S.market_cap, S.coin_id);
+
+  - id: purge_files
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles
+    description: To avoid cluttering the storage, we will remove the downloaded files
+
+pluginDefaults:
+  - type: io.kestra.plugin.gcp
+    values:
+      serviceAccount: "{{kv('GCP_CREDS')}}"
+      projectId: "{{kv('GCP_PROJECT_ID')}}"
+      bucket: "{{kv('GCP_BUCKET_NAME')}}"
+
+triggers:
+  - id: daily_cron
+    type: io.kestra.plugin.core.trigger.Schedule
+    timezone: "UTC"
+    cron: "0 9 * * *" # Runs daily at 09:00 UTC
