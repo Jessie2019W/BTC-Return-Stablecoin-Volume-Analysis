@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: fct_btc_usdt_correlation
+    description: "Final fact table for BTC USDT  analysis."
+    columns:
+      - name: market_date
+        tests:
+          - not_null
+          - unique
+      - name: btc_price
+        description: "Daily price of BTC in USD."
+      - name: usdt_volume
+        description: "Daily trading volume of USDT in USD."

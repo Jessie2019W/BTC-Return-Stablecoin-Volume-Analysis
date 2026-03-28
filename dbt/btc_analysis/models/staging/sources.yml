@@ -1,0 +1,8 @@
+version: 2  
+
+sources:
+  - name: staging 
+    database: "{{ env_var('DBT_DATABASE') }}"
+    schema: raw_dataset
+    tables:
+      - name: crypto_market
