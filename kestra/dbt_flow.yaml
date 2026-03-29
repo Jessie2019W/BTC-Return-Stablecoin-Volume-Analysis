@@ -2,6 +2,11 @@ id: dbt_model
 namespace: dev
 
 tasks:
+  - id: set_label
+    type: io.kestra.plugin.core.execution.Labels
+    labels:
+      dbt Model: "dbt Model Execution"
+
   - id: sync
     type: io.kestra.plugin.git.SyncNamespaceFiles
     url: https://github.com/Jessie2019W/BTC-Return-Stablecoin-Volume-Analysis

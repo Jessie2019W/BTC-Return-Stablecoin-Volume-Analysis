@@ -10,6 +10,11 @@ variables:
   bq_table: "{{kv('GCP_PROJECT_ID')}}.raw_dataset.crypto_market"
 
 tasks:
+  - id: set_label
+    type: io.kestra.plugin.core.execution.Labels
+    labels:
+      Target Date: "{{ vars.target_date }}"
+      
   - id: log_target_date
     type: io.kestra.plugin.core.log.Log
     message: 
