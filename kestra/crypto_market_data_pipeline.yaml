@@ -13,8 +13,8 @@ tasks:
   - id: set_label
     type: io.kestra.plugin.core.execution.Labels
     labels:
-      Target Date: "{{ vars.target_date }}"
-      
+      Target Date: "{{render(vars.target_date)}}"
+
   - id: log_target_date
     type: io.kestra.plugin.core.log.Log
     message: 
@@ -178,4 +178,4 @@ triggers:
   - id: daily_cron
     type: io.kestra.plugin.core.trigger.Schedule
     timezone: "UTC"
-    cron: "0 9 * * *" # Runs daily at 09:00 UTC
+    cron: "0 8 * * *" 
