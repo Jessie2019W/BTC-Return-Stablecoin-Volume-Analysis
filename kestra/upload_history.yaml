@@ -1,0 +1,111 @@
+id: history_data_pipeline
+namespace: dev
+
+inputs:
+  - id: start_date
+    type: DATE
+    displayName: "Start Date for API fetch"
+    defaults: "2025-06-01" # Example default value
+    description: "The beginning date for the history data fetch (YYYY-MM-DD)."
+
+  - id: end_date
+    type: DATE
+    displayName: "End Date for API fetch"
+    defaults: "{{ now() | dateAdd(-1, 'DAYS') | date('yyyy-MM-dd') }}" # Sets default to yesterday's date
+    description: "The end date for the history data fetch (YYYY-MM-DD), default to yesterday."
+
+variables:
+  file: "history_crypto_market_data.parquet"
+  gcs_file: "gs://{{kv('GCP_BUCKET_NAME')}}/{{vars.file}}"
+  extracted_data: "{{outputs.extract_crypto_data_history.outputFiles['history_crypto_market_data.parquet']}}"
+  bq_table: "{{kv('GCP_PROJECT_ID')}}.raw_dataset.crypto_market"
+
+tasks:
+  - id: set_label
+    type: io.kestra.plugin.core.execution.Labels
+    labels:
+      Start Date: "{{ inputs.start_date }}"
+      End Date: "{{inputs.end_date}}"
+
+  - id: process_data_range
+    type: io.kestra.plugin.core.log.Log
+    message: "Processing data from {{ inputs.start_date }} to {{ inputs.end_date }}"
+
+  - id: sync
+    type: io.kestra.plugin.git.SyncNamespaceFiles
+    url: https://github.com/Jessie2019W/BTC-Return-Stablecoin-Volume-Analysis
+    branch: main
+    namespace: "{{flow.namespace}}"
+    gitDirectory: scripts
+    dryRun: false
+
+  - id: extract_crypto_data_history
+    type: io.kestra.plugin.scripts.python.Commands
+    description: "Extract historical crypto market data using the CoinGecko API and save as Parquet"
+    namespaceFiles:
+      enabled: true
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+    containerImage: python:3.11-slim
+    env:
+      START_DATE: "{{ inputs.start_date }}"
+      END_DATE: "{{ inputs.end_date }}"
+    outputFiles: 
+      - history_crypto_market_data.parquet
+    beforeCommands:
+      - pip install requests
+      - pip install pandas
+      - pip install pyarrow
+    commands:
+      - python extract_data_history.py
+
+  - id: upload_to_gcs
+    type: io.kestra.plugin.gcp.gcs.Upload
+    from: "{{render(vars.extracted_data)}}"
+    to: "{{render(vars.gcs_file)}}"
+
+  - id: create_bq_table
+    type: io.kestra.plugin.gcp.bigquery.Query
+    description: "Create the internal table header if it doesn't exist, partitioned by date"
+    sql: |
+      CREATE TABLE IF NOT EXISTS `{{render(vars.bq_table)}}`
+      (
+          date TIMESTAMP,
+          price FLOAT64,
+          total_volume FLOAT64,
+          market_cap FLOAT64,
+          coin_id STRING
+      )
+      PARTITION BY DATE(date)
+      CLUSTER BY coin_id;
+
+  - id: load_to_staging
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    description: "Load today's Parquet file into a temporary staging table"
+    from: 
+      - "{{render(vars.gcs_file)}}"
+    destinationTable: "{{render(vars.bq_table)}}_staging_history"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+
+  - id: merge_to_final
+    type: io.kestra.plugin.gcp.bigquery.Query
+    description: "Merge staging into final internal table to prevent duplicates"
+    sql: |
+      MERGE INTO `{{render(vars.bq_table)}}` T
+      USING `{{render(vars.bq_table)}}_staging_history` S
+      ON T.date = S.date AND T.coin_id = S.coin_id
+      WHEN NOT MATCHED THEN
+        INSERT (date, price, total_volume, market_cap, coin_id)
+        VALUES (S.date, S.price, S.total_volume, S.market_cap, S.coin_id);
+
+  - id: purge_files
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles
+    description: To avoid cluttering the storage, we will remove the downloaded files
+
+pluginDefaults:
+  - type: io.kestra.plugin.gcp
+    values:
+      serviceAccount: "{{kv('GCP_CREDS')}}"
+      projectId: "{{kv('GCP_PROJECT_ID')}}"
+      bucket: "{{kv('GCP_BUCKET_NAME')}}"

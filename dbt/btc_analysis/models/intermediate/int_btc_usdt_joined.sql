@@ -28,3 +28,4 @@ select
     u.usdt_market_cap
 from btc_daily b
 inner join usdt_daily u on b.market_date = u.market_date
+order by market_date

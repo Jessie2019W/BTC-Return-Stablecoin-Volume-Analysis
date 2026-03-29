@@ -28,7 +28,6 @@ tasks:
       - dbt build
     profiles: |
       default:
-        target: dev
         outputs:
           dev:
             type: bigquery
@@ -40,18 +39,25 @@ tasks:
             threads: 4
             timeout_seconds: 300
             priority: interactive
-        
+        target: dev
 
 triggers:
-  - id: on_pipeline_success
+  - id: on_either_pipeline_success
     type: io.kestra.plugin.core.trigger.Flow
-    description: "Automatically trigger when the crypto_market_data_pipeline flow succeeds"
-    preconditions:
-      id: upstream_flow_check
-      flows:
-        - namespace: "{{flow.namespace}}"
-          flowId: crypto_market_data_pipeline
-          states: [SUCCESS]
+    description: "Automatically trigger when either history_data_pipeline or crypto_market_data_pipeline flow succeeds"
+    conditions:
+      # This condition ensures that only successful executions are considered
+      - type: io.kestra.plugin.core.condition.ExecutionStatus
+        in: [SUCCESS]
+      # This 'Or' condition checks if the successful execution is either of the specified flows
+      - type: io.kestra.plugin.core.condition.Or
+        conditions:
+          - type: io.kestra.plugin.core.condition.ExecutionFlow
+            namespace: dev
+            flowId: history_data_pipeline
+          - type: io.kestra.plugin.core.condition.ExecutionFlow
+            namespace: dev
+            flowId: crypto_market_data_pipeline
 
 pluginDefaults:
   - type: io.kestra.plugin.gcp

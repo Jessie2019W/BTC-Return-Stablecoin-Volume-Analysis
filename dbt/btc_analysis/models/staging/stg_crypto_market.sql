@@ -10,3 +10,4 @@ select
     lower(coin_id) as coin_id
 from source
 where date is not null
+order by market_date, coin_id

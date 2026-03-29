@@ -6,3 +6,4 @@ select
         else 'Low (<2%)'
     end as volatility_category
 from {{ ref('int_btc_usdt_joined') }}
+order by market_date
