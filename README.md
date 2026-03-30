@@ -8,7 +8,7 @@ End-to-end analytics pipeline that joins **Bitcoin** and **Tether (USDT)** marke
 
 ## Problem Statement
 
-The cryptocurrency market is highly volatile, with Bitcoin (BTC) often experiencing sharp price declines, particularly since mid-last year. To mitigate risk during these downturns or periods of market panic, investors frequently convert their BTC holdings into USDT—a stablecoin pegged to the US dollar. This strategy allows them to preserve capital value without exiting the blockchain ecosystem, resulting in a "flight to safety," where BTC instability drives increased demand for USDT.
+The cryptocurrency market is highly volatile, with Bitcoin (BTC) often experiencing sharp price declines, particularly since mid-last year. To mitigate risk during these downturns or periods of market panic, investors frequently convert their BTC holdings into USDT — a stablecoin pegged to the US dollar. This strategy allows them to preserve capital value without exiting the blockchain ecosystem, resulting in a "flight to safety," where BTC instability drives increased demand for USDT.
 
 This project investigates the relationship between BTC price volatility and USDT trading volume. By building an automated data pipeline, it aims to quantify how market turbulence influences stablecoin activity, providing insights into investor behavior and risk-hedging patterns during bearish market conditions. 
 
