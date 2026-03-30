@@ -28,7 +28,8 @@ Orchestration is **Kestra**: a daily flow ingests T−1 data on a schedule; a hi
 - The history flow is significantly faster than the built-in backfill feature in the daily trigger. It is recommended to run this history flow once during the initial setup; thereafter, the daily flow will be handled automatically by the scheduled trigger.
 
 ### Architecture
-![alt text](image.png) 
+
+![alt text](image.png)
 
 ### Repository Layout
 
@@ -118,10 +119,10 @@ cd BTC-Return-Stablecoin-Volume-Analysis
   - **Generate Key:**
     - After creating the account, go to the **Keys** tab.
     - Select **Add Key** > **Create new key** in **JSON** format.
-    - Download the file and rename it to gcp_key.json.
+    - Download the file and rename it to `gcp_key.json`.
   - **Security & Storage:**
-    - Create a folder named .credentials in your project root directory.
-    - Save gcp_key.json into this folder.
+    - Create a folder named `.credentials` in your project root directory.
+    - Save `gcp_key.json` into this folder.
 
 ### 3. Configure Terraform for GCP
 
@@ -182,7 +183,7 @@ If any key is missing, GCS upload, BigQuery steps, or dbt will fail with auth er
 
 ### 6. Run pipelines in Kestra
 
-Execute `history_data_pipeline` — Select `start_date` and `end_date` inputs (defaults in YAML include an example start date).
+Execute `history_data_pipeline` — Select `start_date` and `end_date` inputs (defaults in YAML include an example start and end date).
 
 - Please note that the free public CoinGecko API is limited to the last 365 days of data; ensure you select your date range based on the current execution date.
 
@@ -194,3 +195,25 @@ The `crypto_market_data_pipeline` flow is designed for daily production use. It 
 
 Data source is linked to BigQuery: project `GCP_PROJECT_ID`, dataset `prod_dataset`, table  `fct_btc_usdt_correlation` 
 [Dashboard Example](https://lookerstudio.google.com/reporting/d4c8e0f1-7f6b-43ee-9a4a-a19eb56c915a)
+
+### 8. Cleanup
+
+#### Cloud Resource Cleanup
+
+Navigate back to the `terraform/` directory and run the destroy command:
+
+```bash
+cd terraform
+terraform destroy
+```
+
+This will permanently delete the GCS bucket and all BigQuery datasets/tables created during the setup.
+
+#### Stop Kestra and Docker Containers
+
+From the project root (`cd ..`), stop and remove the containers and their volumes:
+
+```bash
+docker compose down -v
+```
+
