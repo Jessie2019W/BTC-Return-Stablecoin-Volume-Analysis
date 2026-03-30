@@ -69,7 +69,7 @@ The **internal** table `raw_dataset.crypto_market` is created by Kestra using gc
 - **Partitioning:** `PARTITION BY DATE(date)` — pruning by calendar day for time-window queries and incremental patterns.
 - **Clustering:** `CLUSTER BY coin_id` — colocates `bitcoin` and `tether` rows for faster filters and joins on `coin_id`.
 
-Terraform provisions `**raw_dataset`** and `**prod_dataset`**; table DDL and merge logic live in the Kestra flows so the physical design stays aligned with the load jobs.
+Terraform provisions `raw_dataset` and `prod_dataset`; table DDL and merge logic live in the Kestra flows so the physical design stays aligned with the load jobs.
 
 ---
 
