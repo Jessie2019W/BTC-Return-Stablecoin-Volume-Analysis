@@ -1,6 +1,6 @@
 # BTC Return vs. USDT Volume Analysis
 
-End-to-end analytics pipeline that joins **Bitcoin** and **Tether (USDT)** market snapshots from a single API source, lands them in a governed warehouse, and models **BTC price movement (volatility)** alongside **USDT trading volume** for reporting in **Looker Studio**.
+End-to-end analytics pipeline that joins **Bitcoin** and **Tether (USDT)** market snapshots from CoinGecko API, lands them in a governed warehouse, and models **BTC price movement (volatility)** alongside **USDT trading volume** for reporting in **Looker Studio**.
 
 [Dashboard Example](https://lookerstudio.google.com/reporting/d4c8e0f1-7f6b-43ee-9a4a-a19eb56c915a)
 
