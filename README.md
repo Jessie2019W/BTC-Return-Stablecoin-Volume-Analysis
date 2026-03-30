@@ -23,7 +23,7 @@ The design follows **ELT**: extract and load first, transform in the warehouse.
 3. **Transform** — **dbt** reads `raw_dataset.crypto_market`, builds `stg_crypto_market` → `int_btc_usdt_joined` → `fct_btc_usdt_correlation` in `prod_dataset`.
 4. **Consume** — **Looker Studio** connects to BigQuery (typically the  `prod_dataset`) for charts and exploration.
 
-Orchestration is **Kestra**: a daily flow ingests T−1 data on a schedule; an optional history flow backfills a date range; a **dbt** flow runs after either ingest succeeds.
+Orchestration is **Kestra**: a daily flow ingests T−1 data on a schedule; a history flow backfills a date range; a dbt flow runs after either ingest succeeds.
 
 - The history flow is significantly faster than the built-in backfill feature in the daily trigger. It is recommended to run this history flow once during the initial setup; thereafter, the daily flow will be handled automatically by the scheduled trigger.
 
