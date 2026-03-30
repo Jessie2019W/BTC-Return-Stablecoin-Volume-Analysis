@@ -4,6 +4,8 @@ End-to-end analytics pipeline that joins **Bitcoin** and **Tether (USDT)** marke
 
 [Dashboard Example](https://lookerstudio.google.com/reporting/d4c8e0f1-7f6b-43ee-9a4a-a19eb56c915a)
 
+![alt text](image-1.png)
+
 ---
 
 ## Problem Statement
